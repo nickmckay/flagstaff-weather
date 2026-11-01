@@ -64,15 +64,16 @@ a { color: var(--link); }
 .site-header .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px; padding-top: 14px; padding-bottom: 14px; }
 .brand { font-weight: 650; color: var(--text-primary); text-decoration: none; letter-spacing: -0.01em; }
 nav { display: flex; gap: 18px; font-size: 14px; }
-nav a { color: var(--text-primary); text-decoration: none; font-weight: 550; }
-nav .soon { color: var(--text-muted); }
+nav a { color: var(--text-secondary); text-decoration: none; padding: 2px 0; border-bottom: 2px solid transparent; }
+nav a:hover { color: var(--text-primary); }
+nav a[aria-current="page"] { color: var(--text-primary); font-weight: 600; border-bottom-color: var(--accent); }
 
 .intro { padding: 40px 0 8px; }
 .eyebrow { margin: 0 0 6px; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
 h1 { margin: 0 0 10px; font-size: clamp(26px, 5vw, 38px); line-height: 1.15; letter-spacing: -0.02em; font-weight: 700; text-wrap: balance; }
 .lede { margin: 0; max-width: 62ch; color: var(--text-secondary); font-size: 17px; }
 
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 24px 0; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 16px 0 24px; }
 .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
 .tile .label { font-size: 13px; color: var(--text-secondary); }
 .tile .value { font-size: 28px; font-weight: 650; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
@@ -123,3 +124,12 @@ tr.is-current td { font-weight: 700; }
 
 .site-footer { padding: 16px 16px 40px; font-size: 13px; color: var(--text-muted); }
 .site-footer p { margin: 0 0 8px; max-width: 80ch; }
+
+.chart .label-strong, .chart .label-sec { paint-order: stroke; stroke: var(--surface-1); stroke-width: 4px; stroke-linejoin: round; }
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 24px 0 0; }
+.controls-label { font-size: 13px; color: var(--text-secondary); }
+.toggle { display: inline-flex; background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
+.toggle button { font: inherit; font-size: 13px; color: var(--text-secondary); background: none; border: 0; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+.toggle button[aria-pressed="true"] { background: var(--text-primary); color: var(--surface-1); font-weight: 600; }
+.toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

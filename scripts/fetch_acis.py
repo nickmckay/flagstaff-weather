@@ -1,10 +1,11 @@
 """Fetch the Flagstaff daily record from NOAA ACIS and build the site's data files.
 
 Writes:
-  data/daily.csv            full daily record (date, pcpn, snow, maxt, mint)
-  data/october_precip.json  cumulative October precipitation by year + climatology
+  data/daily.csv          full daily record (date, pcpn, snow, maxt, mint)
+  data/<season>.json      cumulative series for each season in SEASONS
 """
 
+import calendar
 import csv
 import json
 import sys
@@ -16,7 +17,17 @@ from pathlib import Path
 ACIS_URL = "https://data.rcc-acis.org/StnData"
 STATION = "FLGthr"  # "Flagstaff Area" threaded record, 1898-present
 ELEMS = ["pcpn", "snow", "maxt", "mint"]
-MAX_MISSING_DAYS = 3  # Octobers with more missing days are excluded from statistics
+
+# A season is labeled by the calendar year it ends in (water year 2027 =
+# Oct 2026-Sep 2027; snow season 2027 = Jul 2026-Jun 2027, matching the
+# spreadsheet's "June year" convention).
+SEASONS = [
+    {"id": "october", "element": "pcpn", "start": (10, 1), "end": (10, 31)},
+    {"id": "monsoon", "element": "pcpn", "start": (6, 15), "end": (9, 15)},
+    {"id": "water_year", "element": "pcpn", "start": (10, 1), "end": (9, 30)},
+    {"id": "snow", "element": "snow", "start": (7, 1), "end": (6, 30)},
+]
+MISSING_FRACTION = 0.05  # seasons missing more days than this (min 3) are excluded
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
@@ -53,84 +64,84 @@ def write_daily_csv(rows: list, path: Path) -> None:
         w.writerows(rows)
 
 
-def percentile(sorted_vals: list, q: float) -> float:
-    """Linear-interpolated percentile of an already-sorted list."""
-    pos = (len(sorted_vals) - 1) * q
-    lo = int(pos)
-    hi = min(lo + 1, len(sorted_vals) - 1)
-    return sorted_vals[lo] + (sorted_vals[hi] - sorted_vals[lo]) * (pos - lo)
+def season_days(spec: dict) -> list[tuple[int, int]]:
+    """(month, day) for every day of the season, using a leap-year template
+    so Feb 29 has a slot; in non-leap years that day adds nothing."""
+    crosses = spec["end"] < spec["start"]
+    d = date(1999 if crosses else 2000, *spec["start"])
+    end = date(2000, *spec["end"])
+    out = []
+    while d <= end:
+        out.append((d.month, d.day))
+        d += timedelta(days=1)
+    return out
 
 
-def build_october(rows: list, today: date) -> dict:
-    """Cumulative October precipitation for every year in the record."""
-    target_year = today.year if today.month >= 10 else today.year - 1
+def build_season(spec: dict, values: dict, first: date, last: date) -> dict:
+    """Cumulative series for every season year in the record."""
+    template = season_days(spec)
+    crosses = spec["end"] < spec["start"]
+    max_missing = max(3, round(MISSING_FRACTION * len(template)))
+    digits = 1 if spec["element"] == "snow" else 2
 
-    daily = {}  # year -> [31 values, None = missing]
-    for row in rows:
-        d = date.fromisoformat(row[0])
-        if d.month != 10:
-            continue
-        daily.setdefault(d.year, [None] * 31)[d.day - 1] = parse_value(row[1])
+    def start_of(year):
+        return date(year - 1 if crosses else year, *spec["start"])
 
-    years, totals, missing_days = {}, {}, {}
-    for year, vals in sorted(daily.items()):
-        if year == target_year:
-            continue
-        n_missing = sum(v is None for v in vals)
-        missing_days[year] = n_missing
-        cum, run = [], 0.0
-        for v in vals:
+    first_year = first.year + (1 if crosses else 0)
+    if start_of(first_year) < first:
+        first_year += 1
+    current_year = last.year + (1 if crosses and (last.month, last.day) >= spec["start"] else 0)
+    if start_of(current_year) > last:
+        current_year -= 1
+
+    years, missing = {}, {}
+    current = None
+    for year in range(first_year, current_year + 1):
+        sy = start_of(year).year
+        cum, run, n_missing, through = [], 0.0, 0, 0
+        for i, (m, d) in enumerate(template):
+            cal_year = sy if (m, d) >= spec["start"] else sy + 1
+            if m == 2 and d == 29 and not calendar.isleap(cal_year):
+                v = 0.0
+            else:
+                day = date(cal_year, m, d)
+                if day > last:
+                    break
+                v = values.get(day)
+            if v is None:
+                n_missing += 1
+            else:
+                through = i + 1
             run += v or 0.0
-            cum.append(round(run, 2))
-        years[str(year)] = cum
-        totals[str(year)] = cum[-1]
+            cum.append(round(run, digits))
 
-    complete = [y for y in years if missing_days[int(y)] <= MAX_MISSING_DAYS]
+        if year == current_year and through < len(template):
+            current = {"year": year, "cumulative": cum[:through], "through_index": through,
+                       "missing_days": n_missing - (len(cum) - through)}
+        else:
+            years[str(year)] = cum
+            missing[str(year)] = n_missing
 
-    clim = {"p10": [], "median": [], "p90": [], "max": [], "min": []}
-    for i in range(31):
-        vals = sorted(years[y][i] for y in complete)
-        clim["p10"].append(round(percentile(vals, 0.10), 2))
-        clim["median"].append(round(percentile(vals, 0.50), 2))
-        clim["p90"].append(round(percentile(vals, 0.90), 2))
-        clim["max"].append(vals[-1])
-        clim["min"].append(vals[0])
+    if current is None:  # the latest season just finished; show it as current
+        current = {"year": current_year, "cumulative": years[str(current_year)],
+                   "through_index": len(template), "missing_days": missing[str(current_year)]}
 
-    # Current October: cumulative through the last reported day.
-    cur_vals = daily.get(target_year, [])
-    last_day = max((i + 1 for i, v in enumerate(cur_vals) if v is not None), default=0)
-    cur_cum, run = [], 0.0
-    for v in cur_vals[:last_day]:
-        run += v or 0.0
-        cur_cum.append(round(run, 2))
-
-    current = {"year": target_year, "cumulative": cur_cum, "through_day": last_day}
-    if last_day:
-        so_far = cur_cum[-1]
-        to_date = sorted((years[y][last_day - 1] for y in complete), reverse=True)
-        current["total"] = so_far
-        current["rank_wettest"] = 1 + sum(v > so_far for v in to_date)
-        current["n_years"] = len(to_date) + 1
-        current["median_to_date"] = clim["median"][last_day - 1]
-        current["pct_of_median"] = (
-            round(100 * so_far / clim["median"][last_day - 1])
-            if clim["median"][last_day - 1] > 0 else None
-        )
-
-    ranked = sorted(complete, key=lambda y: totals[y], reverse=True)
     return {
         "meta": {
             "station": STATION,
             "source": "NOAA Regional Climate Centers ACIS (data.rcc-acis.org)",
             "updated": datetime.now(timezone.utc).isoformat(timespec="minutes"),
-            "max_missing_days": MAX_MISSING_DAYS,
+            "record_end": last.isoformat(),
+            "max_missing_days": max_missing,
+        },
+        "season": {
+            "id": spec["id"],
+            "element": spec["element"],
+            "dates": [f"{m:02d}-{d:02d}" for m, d in template],
         },
         "years": years,
-        "complete_years": [int(y) for y in complete],
-        "missing_days": {str(y): n for y, n in missing_days.items()},
-        "wettest": [{"year": int(y), "total": totals[y]} for y in ranked[:5]],
-        "driest": [{"year": int(y), "total": totals[y]} for y in ranked[::-1][:5]],
-        "climatology": clim,
+        "complete_years": [int(y) for y, n in missing.items() if n <= max_missing],
+        "missing_days": missing,
         "current": current,
     }
 
@@ -141,18 +152,23 @@ def main() -> None:
     DATA_DIR.mkdir(exist_ok=True)
     write_daily_csv(data, DATA_DIR / "daily.csv")
 
-    october = build_october(data, today)
-    october["meta"]["station_name"] = meta.get("name")
-    october["meta"]["record_start"] = data[0][0]
-    october["meta"]["record_end"] = data[-1][0]
-    with (DATA_DIR / "october_precip.json").open("w") as f:
-        json.dump(october, f, separators=(",", ":"))
+    col = {e: i + 1 for i, e in enumerate(ELEMS)}
+    first = date.fromisoformat(data[0][0])
+    reported = [r for r in data if r[col["pcpn"]] != "M"]
+    last = date.fromisoformat(reported[-1][0])
 
-    cur = october["current"]
-    print(f"{len(data)} days through {data[-1][0]}; "
-          f"{len(october['complete_years'])} complete Octobers; "
-          f"Oct {cur['year']}: {cur.get('total')} in through day {cur['through_day']}, "
-          f"rank {cur.get('rank_wettest')}/{cur.get('n_years')}")
+    for spec in SEASONS:
+        values = {date.fromisoformat(r[0]): parse_value(r[col[spec["element"]]]) for r in data}
+        out = build_season(spec, values, first, last)
+        out["meta"]["station_name"] = meta.get("name")
+        with (DATA_DIR / f"{spec['id']}.json").open("w") as f:
+            json.dump(out, f, separators=(",", ":"))
+        cur = out["current"]
+        total = cur["cumulative"][-1] if cur["cumulative"] else None
+        print(f"{spec['id']}: {len(out['complete_years'])} complete seasons; "
+              f"{cur['year']}: {total} through {out['season']['dates'][cur['through_index'] - 1]}")
+
+    print(f"{len(data)} days, last reported {last}")
 
 
 if __name__ == "__main__":

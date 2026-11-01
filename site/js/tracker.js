@@ -6,7 +6,7 @@ const cfg = SEASONS[seasonId];
 let data, fmt;
 
 renderShell();
-fetch(`data/${seasonId}.json`)
+fetch(`data/${seasonId}.json`, { cache: "no-cache" })
   .then((r) => r.json())
   .then((d) => {
     data = d;

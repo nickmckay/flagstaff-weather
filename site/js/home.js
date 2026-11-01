@@ -5,7 +5,7 @@ const loaded = {};
 
 renderShell();
 Promise.all(ORDER.map((id) =>
-  fetch(`data/${id}.json`).then((r) => r.json()).then((d) => { loaded[id] = d; })))
+  fetch(`data/${id}.json`, { cache: "no-cache" }).then((r) => r.json()).then((d) => { loaded[id] = d; })))
   .then(() => {
     renderCards();
     document.getElementById("updated").textContent = updatedText(loaded[ORDER[0]]);

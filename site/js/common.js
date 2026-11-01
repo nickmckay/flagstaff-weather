@@ -199,3 +199,29 @@ function headlineText(data, s, cfg) {
   const rankText = r === 1 ? `the ${word}` : `the ${ordinal(r)}‑${word}`;
   return `${cfg.name(cur.year)} ${s.done ? "was" : "is"} ${rankText} ${since}${s.done ? "" : ` through ${s.asOf}`}`;
 }
+
+// ---- ENSO coloring ------------------------------------------------------------
+
+const ENSO_LIMIT = 1.5; // season-mean Nino 3.4 anomaly (degC) at which color saturates
+
+// Diverging blue (La Nina) - gray (neutral) - red (El Nino), read from the
+// current theme's tokens so light and dark modes each get their own steps.
+function ensoScale() {
+  const css = getComputedStyle(document.documentElement);
+  const token = (name) => css.getPropertyValue(name).trim();
+  const scale = d3.scaleLinear()
+    .domain([-ENSO_LIMIT, 0, ENSO_LIMIT])
+    .range([token("--enso-cool"), token("--enso-mid"), token("--enso-warm")])
+    .interpolate(d3.interpolateLab)
+    .clamp(true);
+  return (v) => (v == null ? token("--enso-mid") : scale(v));
+}
+
+function ensoPhase(v) {
+  if (v == null) return "no data";
+  if (v >= 0.5) return "El Niño";
+  if (v <= -0.5) return "La Niña";
+  return "neutral";
+}
+
+const signed = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(1);

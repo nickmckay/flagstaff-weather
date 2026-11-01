@@ -13,6 +13,11 @@
   --history-strong: #52514e;
   --median: #77756f;
   --link: #1c5cab;
+  --current: #0b0b0b;
+  --band-wash: rgba(82, 81, 78, 0.10);
+  --enso-cool: #1c5cab;
+  --enso-mid: #c9c7bf;
+  --enso-warm: #c4302f;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -30,6 +35,11 @@
     --history-strong: #c3c2b7;
     --median: #96958c;
     --link: #86b6ef;
+    --current: #f0efec;
+    --band-wash: rgba(195, 194, 183, 0.10);
+    --enso-cool: #5598e7;
+    --enso-mid: #4f4f4b;
+    --enso-warm: #ec6e6c;
   }
 }
 :root[data-theme="dark"] {
@@ -47,6 +57,11 @@
   --history-strong: #c3c2b7;
   --median: #96958c;
   --link: #86b6ef;
+  --current: #f0efec;
+  --band-wash: rgba(195, 194, 183, 0.10);
+  --enso-cool: #5598e7;
+  --enso-mid: #4f4f4b;
+  --enso-warm: #ec6e6c;
 }
 
 * { box-sizing: border-box; }
@@ -87,20 +102,20 @@ h1 { margin: 0 0 10px; font-size: clamp(26px, 5vw, 38px); line-height: 1.15; let
 .legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--text-secondary); }
 .legend li { display: flex; align-items: center; gap: 6px; }
 .legend .key { display: inline-block; width: 18px; height: 0; border-top: 2px solid; }
-.legend .key.band { height: 10px; border: 0; background: var(--accent-wash); border-radius: 2px; }
+.legend .key.band { height: 10px; border: 0; background: var(--band-wash); border-radius: 2px; }
 
 .chart { width: 100%; touch-action: pan-y; }
 .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
 .chart text { fill: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .chart .grid line { stroke: var(--grid); stroke-width: 1; }
 .chart .domain { display: none; }
-.chart .history path { fill: none; stroke: var(--history); stroke-width: 1; stroke-opacity: 0.55; }
-.chart .history path.hl { stroke: var(--history-strong); stroke-opacity: 1; stroke-width: 2; }
-.chart .band { fill: var(--accent-wash); }
+.chart .history path { fill: none; stroke-width: 1.25; }
+.chart .history path.hl { stroke-opacity: 1 !important; stroke-width: 3; }
+.chart .band { fill: var(--band-wash); }
 .chart .median { fill: none; stroke: var(--median); stroke-width: 2; }
-.chart .record { fill: none; stroke: var(--history-strong); stroke-width: 1.5; }
-.chart .current { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
-.chart .current-dot { fill: var(--accent); stroke: var(--surface-1); stroke-width: 2; }
+.chart .record { fill: none; stroke-width: 2.25; }
+.chart .current { fill: none; stroke: var(--current); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+.chart .current-dot { fill: var(--current); stroke: var(--surface-1); stroke-width: 2; }
 .chart .label-strong { fill: var(--text-primary); font-weight: 600; }
 .chart .label-sec { fill: var(--text-secondary); }
 .chart .crosshair { stroke: var(--text-muted); stroke-width: 1; }
@@ -152,11 +167,16 @@ tr.is-current td { font-weight: 700; }
 .card-figure .sub { font-size: 14px; color: var(--text-secondary); }
 .spark { margin: 8px 0 4px; }
 .spark svg { display: block; width: 100%; height: auto; }
-.spark .band { fill: var(--accent-wash); }
+.spark .band { fill: var(--band-wash); }
 .spark .median { fill: none; stroke: var(--median); stroke-width: 1.5; }
-.spark .current { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
-.spark .current-dot { fill: var(--accent); stroke: var(--surface-1); stroke-width: 2; }
+.spark .current { fill: none; stroke: var(--current); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.spark .current-dot { fill: var(--current); stroke: var(--surface-1); stroke-width: 2; }
 .spark-base { stroke: var(--grid); stroke-width: 1; }
 .card-foot { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-top: auto; padding-top: 2px; }
 .card-foot .more { color: var(--link); font-weight: 600; }
 .spark-legend { margin: 14px 0 0; }
+
+.enso-ramp { display: inline-block; width: 56px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--enso-cool), var(--enso-mid), var(--enso-warm)); }
+.enso-ends { display: inline-flex; gap: 6px; }
+.enso-ends span + span::before { content: "·"; margin-right: 6px; }
+.tooltip .sub-row { font-size: 12px; color: var(--text-muted); margin: -2px 0 4px 16px; }

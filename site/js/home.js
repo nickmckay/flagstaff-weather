@@ -28,7 +28,7 @@ function renderShell() {
   </section>
   ${toggleHTML()}
   <ul class="legend spark-legend">
-    <li><span class="key" style="border-color:var(--accent);border-top-width:3px"></span>This season</li>
+    <li><span class="key" style="border-color:var(--current);border-top-width:3px"></span>This season</li>
     <li><span class="key" style="border-color:var(--median)"></span>Median</li>
     <li><span class="key band"></span>Typical range (10th–90th percentile)</li>
   </ul>

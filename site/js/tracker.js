@@ -41,12 +41,12 @@ function renderShell() {
     </div>
     <div class="chart" id="chart" role="img"></div>
     <div class="tooltip" id="tooltip" hidden></div>
-    <p class="note">${cfg.note} Hover or tap the chart to see a day's numbers. The year nearest your pointer is highlighted. Trace amounts count as zero.</p>
+    <p class="note">${cfg.note} Past seasons are colored by the Niño 3.4 sea-surface temperature anomaly averaged over the season's months: red for El Niño, blue for La Niña, gray for neutral. <span id="nino-latest"></span> Hover or tap the chart to see a day's numbers. The year nearest your pointer is highlighted. Trace amounts count as zero.</p>
   </section>
   <section class="table-card">
     <details>
       <summary>All seasons, ranked by total</summary>
-      <div class="table-scroll"><table id="table"><thead><tr><th>Rank</th><th>Season</th><th class="num">Total (in)</th></tr></thead><tbody></tbody></table></div>
+      <div class="table-scroll"><table id="table"><thead><tr><th>Rank</th><th>Season</th><th class="num">Total (in)</th><th class="num">Niño 3.4</th></tr></thead><tbody></tbody></table></div>
     </details>
   </section>
 </main>
@@ -110,23 +110,28 @@ function renderSummary(s) {
 
 function renderLegend(s) {
   const items = [
-    [`<span class="key" style="border-color:var(--accent);border-top-width:3px"></span>`, cfg.short(data.current.year)],
-    [`<span class="key" style="border-color:var(--history-strong)"></span>`, `${cfg.short(s.record.year)} (${mode === "all" ? "record" : "highest"})`],
+    [`<span class="key" style="border-color:var(--current);border-top-width:3px"></span>`, cfg.short(data.current.year)],
     [`<span class="key" style="border-color:var(--median)"></span>`, "Median"],
     [`<span class="key band"></span>`, "10th–90th percentile"],
-    [`<span class="key" style="border-color:var(--history);border-top-width:1px"></span>`, "Other years"],
+    [`<span class="enso-ramp" aria-hidden="true"></span>`, `Past seasons by Niño 3.4: <span class="enso-ends"><span>La Niña ${signed(-ENSO_LIMIT)}°</span><span>El Niño ${signed(ENSO_LIMIT)}°</span></span>`],
   ];
   document.getElementById("legend").innerHTML = items.map(([k, t]) => `<li>${k}${t}</li>`).join("");
+
+  const latest = data.meta.nino34_latest;
+  document.getElementById("nino-latest").textContent = latest
+    ? `The latest monthly value is ${signed(latest.value)} °C (${MONTHS[latest.month - 1]} ${latest.year}, ${ensoPhase(latest.value)}).`
+    : "";
 }
 
 function renderTable(s) {
   const cur = data.current;
   const rows = s.years.map((d) => ({ year: d.year, total: d.cum[s.n - 1] }));
+  const nino = (y) => (data.nino34[y] == null ? "—" : signed(data.nino34[y]));
   if (s.t !== undefined) rows.push({ year: cur.year, total: s.total, partial: !s.done });
   rows.sort((a, b) => b.total - a.total || a.year - b.year);
   document.querySelector("#table tbody").innerHTML = rows.map((r, i) => `
     <tr class="${r.year === cur.year ? "is-current" : ""}">
-      <td>${i + 1}</td><td>${cfg.short(r.year)}${r.partial ? ` (through ${dateLabel(data.season.dates[s.t])})` : ""}</td><td class="num">${fmt(r.total)}</td>
+      <td>${i + 1}</td><td>${cfg.short(r.year)}${r.partial ? ` (through ${dateLabel(data.season.dates[s.t])})` : ""}</td><td class="num">${fmt(r.total)}</td><td class="num">${nino(r.year)}</td>
     </tr>`).join("");
 }
 
@@ -178,15 +183,20 @@ function renderChart(s) {
   svg.append("g").attr("transform", `translate(0,${height - m.bottom})`)
     .call(d3.axisBottom(x).tickValues(xt.ticks).tickSize(0).tickPadding(10).tickFormat(xt.label));
 
+  const color = ensoScale();
+  const strength = (d) => Math.min(1, Math.abs(data.nino34[d.year] ?? 0) / ENSO_LIMIT);
   const histPaths = svg.append("g").attr("class", "history")
-    .selectAll("path").data(years).join("path")
-    .attr("d", (d) => line(d.cum));
+    .selectAll("path").data([...years].sort((a, b) => strength(a) - strength(b))).join("path")
+    .attr("d", (d) => line(d.cum))
+    .style("stroke", (d) => color(data.nino34[d.year]))
+    .style("stroke-opacity", (d) => 0.45 + 0.45 * strength(d));
 
   // Band drawn over the history lines so it stays visible through them.
   svg.append("path").attr("class", "band")
     .attr("d", d3.area().x((_, i) => x(i)).y0((_, i) => y(clim.p10[i])).y1((v) => y(v))(clim.p90));
   svg.append("path").attr("class", "median").attr("d", line(clim.median));
-  svg.append("path").attr("class", "record").attr("d", line(record.cum));
+  svg.append("path").attr("class", "record").attr("d", line(record.cum))
+    .style("stroke", color(data.nino34[record.year]));
 
   const curN = cur.cumulative.length;
   if (curN) {
@@ -234,17 +244,20 @@ function renderChart(s) {
     hlPath = histPaths.filter((d) => d === nearest).classed("hl", true).raise();
     cross.style("display", null).attr("x1", x(i)).attr("x2", x(i));
 
-    const points = [{ v: nearest.cum[i], color: "var(--history-strong)" }];
+    const nn = data.nino34[nearest.year];
+    const nearColor = color(nn);
+    const points = [{ v: nearest.cum[i], color: nearColor }];
     const curVal = i < curN ? cur.cumulative[i] : null;
-    if (curVal != null) points.push({ v: curVal, color: "var(--accent)" });
+    if (curVal != null) points.push({ v: curVal, color: "var(--current)" });
     dots.selectAll("circle").data(points).join("circle")
       .attr("class", "hover-dot").attr("r", 4.5)
       .attr("cx", x(i)).attr("cy", (d) => y(d.v)).attr("fill", (d) => d.color);
 
     tooltip.innerHTML = `
       <div class="t-head">Through ${dateLabel(dates[i])}</div>
-      ${curVal != null ? `<div class="row"><span><span class="sw" style="background:var(--accent)"></span>${cfg.short(cur.year)}</span><b>${fmt(curVal)}″</b></div>` : ""}
-      <div class="row"><span><span class="sw" style="background:var(--history-strong)"></span>${cfg.short(nearest.year)}</span><b>${fmt(nearest.cum[i])}″</b></div>
+      ${curVal != null ? `<div class="row"><span><span class="sw" style="background:var(--current)"></span>${cfg.short(cur.year)}</span><b>${fmt(curVal)}″</b></div>` : ""}
+      <div class="row"><span><span class="sw" style="background:${nearColor}"></span>${cfg.short(nearest.year)}</span><b>${fmt(nearest.cum[i])}″</b></div>
+      <div class="row sub-row"><span>Niño 3.4 ${nn == null ? "—" : `${signed(nn)} °C`}</span><span>${ensoPhase(nn)}</span></div>
       <div class="row"><span>Median</span><b>${fmt(clim.median[i])}″</b></div>
       <div class="row"><span>10th–90th</span><b>${fmt(clim.p10[i])}–${fmt(clim.p90[i])}″</b></div>
       <div class="row"><span>${mode === "all" ? "Record" : "Highest"}</span><b>${fmt(clim.max[i])}″</b></div>`;

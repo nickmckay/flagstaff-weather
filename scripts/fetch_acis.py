@@ -2,7 +2,9 @@
 
 Writes:
   data/daily.csv          full daily record (date, pcpn, snow, maxt, mint)
-  data/<season>.json      cumulative series for each season in SEASONS
+  data/nino34.csv         monthly Nino 3.4 anomalies (NOAA PSL, HadISST, 1870-present)
+  data/<season>.json      cumulative series for each season in SEASONS, with the
+                          season-mean Nino 3.4 for each year
 """
 
 import calendar
@@ -27,6 +29,7 @@ SEASONS = [
     {"id": "water_year", "element": "pcpn", "start": (10, 1), "end": (9, 30)},
     {"id": "snow", "element": "snow", "start": (7, 1), "end": (6, 30)},
 ]
+NINO34_URL = "https://psl.noaa.gov/data/timeseries/month/data/nino34.long.anom.data"
 MISSING_FRACTION = 0.05  # seasons missing more days than this (min 3) are excluded
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -55,6 +58,41 @@ def parse_value(raw: str):
     if raw == "T":
         return 0.0
     return float(raw.rstrip("ASMT"))
+
+
+def fetch_nino34() -> dict:
+    """Monthly Nino 3.4 anomalies as {(year, month): value}."""
+    with urllib.request.urlopen(NINO34_URL, timeout=60) as resp:
+        lines = resp.read().decode().splitlines()
+    first, last = (int(v) for v in lines[0].split())
+    out = {}
+    for line in lines[1:]:
+        parts = line.split()
+        if len(parts) != 13 or not parts[0].isdigit() or not first <= int(parts[0]) <= last:
+            continue
+        for month, raw in enumerate(parts[1:], start=1):
+            v = float(raw)
+            if v > -99:
+                out[(int(parts[0]), month)] = v
+    return out
+
+
+def season_nino34(spec: dict, years, nino: dict) -> dict:
+    """Mean Nino 3.4 over each season's months (partial seasons use what exists)."""
+    crosses = spec["end"] < spec["start"]
+    out = {}
+    for year in years:
+        sy = year - 1 if crosses else year
+        m, y = spec["start"][0], sy
+        vals = []
+        while True:
+            if (y, m) in nino:
+                vals.append(nino[(y, m)])
+            if (m, y) == (spec["end"][0], year):
+                break
+            m, y = (1, y + 1) if m == 12 else (m + 1, y)
+        out[str(year)] = round(sum(vals) / len(vals), 2) if vals else None
+    return out
 
 
 def write_daily_csv(rows: list, path: Path) -> None:
@@ -152,6 +190,13 @@ def main() -> None:
     DATA_DIR.mkdir(exist_ok=True)
     write_daily_csv(data, DATA_DIR / "daily.csv")
 
+    nino = fetch_nino34()
+    with (DATA_DIR / "nino34.csv").open("w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["year", "month", "nino34_anom"])
+        w.writerows([y, m, v] for (y, m), v in sorted(nino.items()))
+    nino_latest = max(nino)
+
     col = {e: i + 1 for i, e in enumerate(ELEMS)}
     first = date.fromisoformat(data[0][0])
     reported = [r for r in data if r[col["pcpn"]] != "M"]
@@ -161,6 +206,11 @@ def main() -> None:
         values = {date.fromisoformat(r[0]): parse_value(r[col[spec["element"]]]) for r in data}
         out = build_season(spec, values, first, last)
         out["meta"]["station_name"] = meta.get("name")
+        all_years = [int(y) for y in out["years"]] + [out["current"]["year"]]
+        out["nino34"] = season_nino34(spec, all_years, nino)
+        out["meta"]["nino34_source"] = "NOAA PSL Nino 3.4 (HadISST), anomaly from 1981-2010"
+        out["meta"]["nino34_latest"] = {"year": nino_latest[0], "month": nino_latest[1],
+                                        "value": nino[nino_latest]}
         with (DATA_DIR / f"{spec['id']}.json").open("w") as f:
             json.dump(out, f, separators=(",", ":"))
         cur = out["current"]

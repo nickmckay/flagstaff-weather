@@ -12,6 +12,7 @@ The landing page (`index.html`) summarizes every tracker with a headline and a s
 ## How it works
 
 - `scripts/fetch_acis.py` downloads the full daily record for the Flagstaff Area threaded station (`FLGthr`) from [NOAA ACIS](https://www.rcc-acis.org/). It writes `data/daily.csv` and one cumulative-series file per season (`data/<season>.json`). Seasons are defined in `SEASONS` at the top of the script; `site/js/common.js` has the matching page text and computes medians, percentiles and ranks for whichever comparison set is selected; `tracker.js` draws the season pages and `home.js` the landing page.
+- The same script downloads the monthly Niño 3.4 index ([NOAA PSL, HadISST, 1870–present](https://psl.noaa.gov/data/timeseries/month/DS/NINO34/)) into `data/nino34.csv` and stores each season's mean over its own months. The charts color past seasons by that value (red El Niño, blue La Niña, gray neutral).
 - `.github/workflows/update.yml` runs the script every morning (15:00 UTC), commits any data changes, and deploys `site/` plus `data/` to GitHub Pages.
 - `data/reference/` holds season snowfall, ENSO, monthly precipitation and Niño 3.4 data imported from my compiled spreadsheet with `scripts/import_xlsx.py` (sources are in `data/reference/SOURCES.md`).
 

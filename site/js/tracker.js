@@ -1,186 +1,38 @@
-// Cumulative season tracker. Each page sets <body data-season="...">; data is
-// built daily by scripts/fetch_acis.py.
-
-const SEASONS = {
-  water_year: {
-    nav: "Water year",
-    eyebrow: "Water-year precipitation",
-    chartTitle: "Running total, Oct 1 – Sep 30",
-    name: (y) => `Water year ${y}`,
-    short: (y) => `WY${y}`,
-    noun: "water year",
-    superlative: "wettest",
-    opposite: "driest",
-    what: "of precipitation",
-    note: "Water years run Oct 1 – Sep 30 and are named for the year they end in. Totals include rain and melted snow.",
-  },
-  snow: {
-    nav: "Snow",
-    eyebrow: "Seasonal snowfall",
-    chartTitle: "Running snowfall total, Jul 1 – Jun 30",
-    name: (y) => `The ${y - 1}–${String(y).slice(2)} snow season`,
-    short: (y) => `${y - 1}–${String(y).slice(2)}`,
-    noun: "snow season",
-    superlative: "snowiest",
-    opposite: "least snowy",
-    what: "of snow",
-    note: "Snow seasons run Jul 1 – Jun 30. Totals are snowfall, not melted water.",
-  },
-  monsoon: {
-    nav: "Monsoon",
-    eyebrow: "Summer monsoon precipitation",
-    chartTitle: "Running total, Jun 15 – Sep 15",
-    name: (y) => `The ${y} monsoon`,
-    short: (y) => String(y),
-    noun: "monsoon",
-    superlative: "wettest",
-    opposite: "driest",
-    what: "of rain",
-    note: "The monsoon window here is the fixed Jun 15 – Sep 15 period the NWS uses.",
-  },
-  october: {
-    nav: "October",
-    eyebrow: "October precipitation",
-    chartTitle: "Running total by day of October",
-    name: (y) => `October ${y}`,
-    short: (y) => String(y),
-    noun: "October",
-    superlative: "wettest",
-    opposite: "driest",
-    what: "of precipitation",
-    note: "",
-  },
-};
-const PAGES = { water_year: "water-year.html", snow: "snow.html", monsoon: "monsoon.html", october: "./" };
-const MODERN_START = 2001;
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+// Cumulative season tracker page. Each page sets <body data-season="...">;
+// data is built daily by scripts/fetch_acis.py. Needs js/common.js.
 
 const seasonId = document.body.dataset.season;
 const cfg = SEASONS[seasonId];
-const ordinal = (n) => {
-  const s = ["th", "st", "nd", "rd"], v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
-};
-const dateLabel = (mmdd) => `${MONTHS[+mmdd.slice(0, 2) - 1]} ${+mmdd.slice(3)}`;
-
-let mode = initialMode();
-let data, digits, fmt;
+let data, fmt;
 
 renderShell();
 fetch(`data/${seasonId}.json`)
   .then((r) => r.json())
   .then((d) => {
     data = d;
-    digits = data.season.element === "snow" ? 1 : 2;
-    fmt = (v) => v.toFixed(digits);
+    fmt = formatter(data);
     renderAll();
     let w = document.getElementById("chart").clientWidth;
     window.addEventListener("resize", () => {
       const nw = document.getElementById("chart").clientWidth;
-      if (nw !== w) { w = nw; renderChart(computeStats()); }
+      if (nw !== w) { w = nw; renderChart(computeStats(data)); }
     });
   })
   .catch((err) => {
     document.getElementById("lede").textContent = "Couldn't load the data: " + err.message;
   });
 
-// ---- comparison-set toggle -------------------------------------------------
-
-function initialMode() {
-  const p = new URLSearchParams(location.search).get("years");
-  if (p === "modern" || p === "all") return p;
-  try { return localStorage.getItem("fw-years") || "all"; } catch { return "all"; }
-}
-
-function setMode(m) {
-  mode = m;
-  try { localStorage.setItem("fw-years", m); } catch {}
-  const url = new URL(location.href);
-  if (m === "all") url.searchParams.delete("years"); else url.searchParams.set("years", m);
-  history.replaceState(null, "", url);
-  updateNavLinks();
-  renderAll();
-}
-
-function updateNavLinks() {
-  document.querySelectorAll("nav a[data-page]").forEach((a) => {
-    a.href = PAGES[a.dataset.page] + (mode === "modern" ? "?years=modern" : "");
-  });
-  document.querySelectorAll(".toggle button").forEach((b) => {
-    b.setAttribute("aria-pressed", String(b.dataset.mode === mode));
-  });
-}
-
-// ---- statistics for the selected comparison set ---------------------------
-
-function quantile(sorted, q) {
-  const pos = (sorted.length - 1) * q, lo = Math.floor(pos), hi = Math.min(lo + 1, sorted.length - 1);
-  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
-}
-
-function computeStats() {
-  const cur = data.current;
-  const n = data.season.dates.length;
-  const years = data.complete_years
-    .filter((y) => y !== cur.year && (mode === "all" || y >= MODERN_START))
-    .map((y) => ({ year: y, cum: data.years[y] }));
-
-  const clim = { p10: [], median: [], p90: [], max: [] };
-  for (let i = 0; i < n; i++) {
-    const vals = years.map((d) => d.cum[i]).sort((a, b) => a - b);
-    clim.p10.push(quantile(vals, 0.1));
-    clim.median.push(quantile(vals, 0.5));
-    clim.p90.push(quantile(vals, 0.9));
-    clim.max.push(vals[vals.length - 1]);
-  }
-
-  const record = years.reduce((a, b) => (b.cum[n - 1] > a.cum[n - 1] ? b : a));
-  const t = cur.through_index - 1;
-  const stats = { years, clim, record, n, firstYear: d3.min(years, (d) => d.year), lastYear: d3.max(years, (d) => d.year) };
-  if (t >= 0) {
-    const total = cur.cumulative[t];
-    stats.total = total;
-    stats.t = t;
-    stats.done = cur.through_index === n;
-    stats.rank = 1 + years.filter((d) => d.cum[t] > total).length;
-    stats.nAbove = stats.rank - 1;
-    stats.nYears = years.length + 1;
-    stats.medianToDate = clim.median[t];
-    stats.pctOfMedian = clim.median[t] > 0 ? Math.round((100 * total) / clim.median[t]) : null;
-  }
-  return stats;
-}
-
 // ---- rendering --------------------------------------------------------------
 
-// Ranks in the lower half read better from the other end ("5th-driest").
-function rankWords(s) {
-  if (s.rank <= s.nYears / 2) return [s.rank, cfg.superlative];
-  return [s.nYears - s.rank + 1, cfg.opposite];
-}
-
 function renderShell() {
-  document.body.innerHTML = `
-<header class="site-header">
-  <div class="wrap">
-    <a class="brand" href="./">Flagstaff Weather</a>
-    <nav>${Object.entries(SEASONS).map(([id, s]) =>
-      `<a data-page="${id}" href="${PAGES[id]}"${id === seasonId ? ' aria-current="page"' : ""}>${s.nav}</a>`).join("")}</nav>
-  </div>
-</header>
+  document.body.innerHTML = `${headerHTML(seasonId)}
 <main class="wrap">
   <section class="intro">
     <p class="eyebrow">${cfg.eyebrow}</p>
     <h1 id="headline">${cfg.eyebrow}</h1>
     <p class="lede" id="lede">Loading…</p>
   </section>
-  <div class="controls">
-    <span class="controls-label" id="toggle-label">Compare with</span>
-    <div class="toggle" role="group" aria-labelledby="toggle-label">
-      <button type="button" data-mode="all">All years</button>
-      <button type="button" data-mode="modern">21st century</button>
-    </div>
-  </div>
+  ${toggleHTML()}
   <section class="tiles" id="tiles" aria-live="polite"></section>
   <section class="chart-card">
     <div class="chart-head">
@@ -198,18 +50,12 @@ function renderShell() {
     </details>
   </section>
 </main>
-<footer class="wrap site-footer">
-  <p id="updated"></p>
-  <p>Daily data: <a href="https://www.rcc-acis.org/">NOAA Regional Climate Centers ACIS</a>, Flagstaff Area threaded record (FLGthr), which joins the Flagstaff city and Pulliam Airport stations. Season snowfall, ENSO and Niño 3.4 reference data were compiled from <a href="https://www.weather.gov/media/wrh/online_publications/TMs/TM-273.pdf">NWS TM-273</a>, <a href="https://www.weather.gov/wrh/Climate?wfo=fgz">NWS Flagstaff</a> and <a href="https://psl.noaa.gov/enso/past_events.html">NOAA PSL</a>.</p>
-  <p><a href="https://github.com/nickmckay/flagstaff-weather">Source on GitHub</a></p>
-</footer>`;
-  document.querySelectorAll(".toggle button").forEach((b) =>
-    b.addEventListener("click", () => setMode(b.dataset.mode)));
-  updateNavLinks();
+${footerHTML()}`;
+  wireToggle(renderAll);
 }
 
 function renderAll() {
-  const stats = computeStats();
+  const stats = computeStats(data);
   renderSummary(stats);
   renderLegend(stats);
   renderTable(stats);
@@ -224,26 +70,16 @@ function renderSummary(s) {
   const headline = document.getElementById("headline");
   const lede = document.getElementById("lede");
 
-  document.getElementById("updated").textContent =
-    `Data through ${data.meta.record_end}. Updated ${new Date(data.meta.updated).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}.`;
+  document.getElementById("updated").textContent = updatedText(data);
+  headline.textContent = headlineText(data, s, cfg);
 
   if (s.t === undefined) {
-    headline.textContent = `${cfg.name(cur.year)} has no reports yet`;
     lede.textContent = "";
     document.getElementById("tiles").innerHTML = "";
     return;
   }
 
-  const asOf = dateLabel(data.season.dates[s.t]);
-  const verb = s.done ? "was" : "is";
-  const through = s.done ? "" : ` through ${asOf}`;
-  if (s.total === 0) {
-    headline.textContent = `${cfg.name(cur.year)} has had no measurable ${data.season.element === "snow" ? "snow" : "precipitation"} yet`;
-  } else {
-    const [r, word] = rankWords(s);
-    const rankText = r === 1 ? `the ${word}` : `the ${ordinal(r)}‑${word}`;
-    headline.textContent = `${cfg.name(cur.year)} ${verb} ${rankText} ${since}${through}`;
-  }
+  const asOf = s.asOf;
 
   const recordTotal = s.record.cum[s.n - 1];
   lede.textContent =
@@ -257,7 +93,7 @@ function renderSummary(s) {
     { cls: "hero", label: s.done ? "Season total" : `Total through ${asOf}`, value: `${fmt(s.total)}<small> ${unit}</small>` },
     s.total === 0
       ? { label: "Seasons with more by this date", value: `${s.nAbove}<small> of ${s.nYears - 1}</small>`, sub: setName }
-      : { label: "Rank", value: `${ordinal(rankWords(s)[0])}<small> of ${s.nYears}</small>`, sub: `${rankWords(s)[1]}${s.done ? "" : " to date"}, ${setName}` },
+      : { label: "Rank", value: `${ordinal(rankWords(s, cfg)[0])}<small> of ${s.nYears}</small>`, sub: `${rankWords(s, cfg)[1]}${s.done ? "" : " to date"}, ${setName}` },
     { label: "Percent of median", value: s.pctOfMedian == null ? "—" : `${s.pctOfMedian}<small>%</small>`, sub: `median ${s.done ? "total" : "to date"} ${fmt(s.medianToDate)} ${unit}` },
     { label: mode === "all" ? "Record" : `Highest since ${MODERN_START}`, value: `${fmt(recordTotal)}<small> ${unit}</small>`, sub: cfg.short(s.record.year) },
   ];

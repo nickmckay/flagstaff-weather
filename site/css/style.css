@@ -1,0 +1,125 @@
+:root {
+  color-scheme: light;
+  --surface-0: #f4f3ef;
+  --surface-1: #fcfcfb;
+  --border: #e3e1da;
+  --grid: #e8e6e0;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #77756f;
+  --accent: #2a78d6;
+  --accent-wash: rgba(42, 120, 214, 0.10);
+  --history: #b9b7ae;
+  --history-strong: #52514e;
+  --median: #77756f;
+  --link: #1c5cab;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2e2e2c;
+    --grid: #2a2a28;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #96958c;
+    --accent: #3987e5;
+    --accent-wash: rgba(57, 135, 229, 0.16);
+    --history: #4a4a46;
+    --history-strong: #c3c2b7;
+    --median: #96958c;
+    --link: #86b6ef;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2e2e2c;
+  --grid: #2a2a28;
+  --text-primary: #f0efec;
+  --text-secondary: #c3c2b7;
+  --text-muted: #96958c;
+  --accent: #3987e5;
+  --accent-wash: rgba(57, 135, 229, 0.16);
+  --history: #4a4a46;
+  --history-strong: #c3c2b7;
+  --median: #96958c;
+  --link: #86b6ef;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--link); }
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+
+.site-header { border-bottom: 1px solid var(--border); background: var(--surface-1); }
+.site-header .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px; padding-top: 14px; padding-bottom: 14px; }
+.brand { font-weight: 650; color: var(--text-primary); text-decoration: none; letter-spacing: -0.01em; }
+nav { display: flex; gap: 18px; font-size: 14px; }
+nav a { color: var(--text-primary); text-decoration: none; font-weight: 550; }
+nav .soon { color: var(--text-muted); }
+
+.intro { padding: 40px 0 8px; }
+.eyebrow { margin: 0 0 6px; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+h1 { margin: 0 0 10px; font-size: clamp(26px, 5vw, 38px); line-height: 1.15; letter-spacing: -0.02em; font-weight: 700; text-wrap: balance; }
+.lede { margin: 0; max-width: 62ch; color: var(--text-secondary); font-size: 17px; }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 24px 0; }
+.tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.tile .label { font-size: 13px; color: var(--text-secondary); }
+.tile .value { font-size: 28px; font-weight: 650; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.tile .value small { font-size: 15px; font-weight: 500; color: var(--text-secondary); }
+.tile .sub { font-size: 13px; color: var(--text-muted); }
+.tile.hero .value { font-size: 48px; line-height: 1.1; }
+
+.chart-card, .table-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 18px 18px 12px; margin-bottom: 16px; position: relative; }
+.chart-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 20px; margin-bottom: 8px; }
+.chart-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--text-secondary); }
+.legend li { display: flex; align-items: center; gap: 6px; }
+.legend .key { display: inline-block; width: 18px; height: 0; border-top: 2px solid; }
+.legend .key.band { height: 10px; border: 0; background: var(--accent-wash); border-radius: 2px; }
+
+.chart { width: 100%; touch-action: pan-y; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.chart .grid line { stroke: var(--grid); stroke-width: 1; }
+.chart .domain { display: none; }
+.chart .history path { fill: none; stroke: var(--history); stroke-width: 1; stroke-opacity: 0.55; }
+.chart .history path.hl { stroke: var(--history-strong); stroke-opacity: 1; stroke-width: 2; }
+.chart .band { fill: var(--accent-wash); }
+.chart .median { fill: none; stroke: var(--median); stroke-width: 2; }
+.chart .record { fill: none; stroke: var(--history-strong); stroke-width: 1.5; }
+.chart .current { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+.chart .current-dot { fill: var(--accent); stroke: var(--surface-1); stroke-width: 2; }
+.chart .label-strong { fill: var(--text-primary); font-weight: 600; }
+.chart .label-sec { fill: var(--text-secondary); }
+.chart .crosshair { stroke: var(--text-muted); stroke-width: 1; }
+.chart .hover-dot { stroke: var(--surface-1); stroke-width: 2; }
+
+.tooltip { position: absolute; pointer-events: none; background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); min-width: 170px; z-index: 2; }
+.tooltip .t-head { font-weight: 600; margin-bottom: 4px; }
+.tooltip .row { display: flex; justify-content: space-between; gap: 14px; color: var(--text-secondary); }
+.tooltip .row b { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tooltip .sw { display: inline-block; width: 10px; height: 2px; vertical-align: middle; margin-right: 6px; }
+
+.note { margin: 8px 0 0; font-size: 13px; color: var(--text-muted); }
+
+details summary { cursor: pointer; font-weight: 600; font-size: 15px; padding: 2px 0 6px; }
+.table-scroll { max-height: 420px; overflow: auto; margin-top: 8px; }
+table { border-collapse: collapse; width: 100%; max-width: 360px; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 4px 10px 4px 0; border-bottom: 1px solid var(--grid); }
+th { position: sticky; top: 0; background: var(--surface-1); color: var(--text-secondary); font-weight: 600; }
+.num { text-align: right; }
+tr.is-current td { font-weight: 700; }
+
+.site-footer { padding: 16px 16px 40px; font-size: 13px; color: var(--text-muted); }
+.site-footer p { margin: 0 0 8px; max-width: 80ch; }

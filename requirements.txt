@@ -1,0 +1,3 @@
+# fetch_acis.py uses only the standard library.
+# openpyxl is needed only for the one-time scripts/import_xlsx.py.
+openpyxl

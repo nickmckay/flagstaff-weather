@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flagstaff Weather</title>
+<meta name="description" content="Cumulative October precipitation in Flagstaff, Arizona, compared with every October since 1898. Updated daily.">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="./">Flagstaff Weather</a>
+    <nav>
+      <a href="./" aria-current="page">October precip</a>
+      <span class="soon" title="Coming soon">Season snow</span>
+      <span class="soon" title="Coming soon">Season rain</span>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="intro">
+    <p class="eyebrow" id="eyebrow">October precipitation</p>
+    <h1 id="headline">Cumulative October precipitation</h1>
+    <p class="lede" id="lede">Loading…</p>
+  </section>
+
+  <section class="tiles" id="tiles" aria-live="polite"></section>
+
+  <section class="chart-card">
+    <div class="chart-head">
+      <h2>Running total by day of October, 1898–present</h2>
+      <ul class="legend" id="legend"></ul>
+    </div>
+    <div class="chart" id="chart" role="img" aria-label="Cumulative October precipitation by day for every year since 1898"></div>
+    <div class="tooltip" id="tooltip" hidden></div>
+    <p class="note">Hover or tap the chart to see a day's numbers. The year nearest your pointer is highlighted. Trace amounts count as zero.</p>
+  </section>
+
+  <section class="table-card">
+    <details>
+      <summary>All Octobers, ranked by total</summary>
+      <div class="table-scroll"><table id="table"><thead><tr><th>Rank</th><th>Year</th><th class="num">Total (in)</th></tr></thead><tbody></tbody></table></div>
+    </details>
+  </section>
+</main>
+
+<footer class="wrap site-footer">
+  <p id="updated"></p>
+  <p>Daily data: <a href="https://www.rcc-acis.org/">NOAA Regional Climate Centers ACIS</a>, Flagstaff Area threaded record (FLGthr), which joins the Flagstaff city and Pulliam Airport stations. Season snowfall, ENSO and Niño 3.4 reference data were compiled from <a href="https://www.weather.gov/media/wrh/online_publications/TMs/TM-273.pdf">NWS TM-273</a>, <a href="https://www.weather.gov/wrh/Climate?wfo=fgz">NWS Flagstaff</a> and <a href="https://psl.noaa.gov/enso/past_events.html">NOAA PSL</a>.</p>
+  <p><a href="https://github.com/nickmckay/flagstaff-weather">Source on GitHub</a></p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="js/october.js"></script>
+</body>
+</html>
